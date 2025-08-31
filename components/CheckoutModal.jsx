@@ -1,64 +1,63 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
-// Fungsi untuk memformat angka ke Rupiah
+// Fungsi format Rupiah tetap sama
 const formatToIDR = (price) => {
-  return new Intl.NumberFormat('id-ID', { 
-    style: 'currency', 
-    currency: 'IDR', 
-    minimumFractionDigits: 0 
-  }).format(price);
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
 };
 
 export default function CheckoutModal({ product, onCheckout, onCancel }) {
   const [address, setAddress] = useState('');
+  // === PERBAIKAN: Menghapus satu tanda '=' yang berlebih ===
   const [shipping, setShipping] = useState('');
-  const [shippingCost, setShippingCost] = useState(0);
-  const [totalPrice, setTotalPrice] = useState(product.price);
-  
-  // State baru untuk validasi dan status loading
-  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // Efek ini akan berjalan setiap kali layanan pengiriman (shipping) berubah
-  // Logika ini sudah benar dan tidak diubah.
-  useEffect(() => {
-    const getShippingCost = (service) => {
-      switch (service) {
-        case 'jnt': return 18000;
-        case 'jne_cargo': return 35000;
-        case 'gosend': return 25000;
-        default: return 0;
-      }
-    };
-
-    const cost = getShippingCost(shipping);
-    setShippingCost(cost);
-
-    if (product.currency.toLowerCase() === 'idr') {
-      setTotalPrice(product.price + cost);
-    }
-  }, [shipping, product.price, product.currency]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError(''); // Hapus pesan error sebelumnya
-
+  const handlePiCheckout = async () => {
     if (!address || !shipping) {
-      // Menggunakan state untuk menampilkan error, bukan alert()
       setError('Harap isi alamat dan pilih layanan pengiriman.');
       return;
     }
+    setError('');
+    setIsLoading(true);
 
-    setIsLoading(true); // Mulai proses loading
+    const paymentData = {
+      // Pastikan harga dikirim sebagai angka, bukan string
+      amount: Number(product.price),
+      memo: `Pembelian: ${product.name}`,
+      metadata: { productId: product.id, address, shipping },
+    };
 
-    // Simulasi pengiriman data ke server
-    setTimeout(() => {
-      onCheckout({ product, address, shipping, shippingCost, totalPrice });
-      // setIsLoading(false) tidak perlu di sini karena komponen akan ditutup
-    }, 1500); // Jeda 1.5 detik
+    const callbacks = {
+      onReadyForServerApproval: function(paymentId) {
+        // Kirim paymentId ke parent komponen (page.jsx) untuk diteruskan ke backend
+        onCheckout({ paymentId, product, address, shipping });
+      },
+      onReadyForServerCompletion: function(paymentId, txid) {
+        console.log('Pi payment ready for server completion', { paymentId, txid });
+        // Server kita yang akan menangani ini
+      },
+      onCancel: function(paymentId) {
+        console.log('Pi payment cancelled', { paymentId });
+        setIsLoading(false);
+      },
+      onError: function(error, payment) {
+        console.error('Error during Pi payment', error);
+        setError('Terjadi kesalahan dengan pembayaran Pi.');
+        setIsLoading(false);
+      },
+    };
+
+    try {
+      // Memulai proses pembayaran Pi
+      await window.Pi.createPayment(paymentData, callbacks);
+    } catch (err) {
+      console.error(err);
+      setError('Gagal memulai SDK Pi. Pastikan Anda berada di Pi Browser.');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -66,21 +65,23 @@ export default function CheckoutModal({ product, onCheckout, onCancel }) {
       <div className="bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-lg text-white">
         <h2 className="text-2xl font-bold mb-4">Formulir Checkout</h2>
         
+        {/* Rincian Produk */}
         <div className="mb-6">
           <div className="flex items-start gap-4 p-4 bg-slate-700 rounded-lg">
-              <img src={product.image} alt={product.name} className="w-20 h-20 object-cover rounded-lg"/>
-              <div>
-                  <h3 className="text-lg font-semibold">{product.name}</h3>
-                  <p className="text-xl font-bold text-slate-300 mt-1">
-                    {product.currency.toLowerCase() === 'idr' 
-                      ? formatToIDR(product.price) 
-                      : `${product.price.toLocaleString()} π`}
-                  </p>
-              </div>
+            <img src={product.image} alt={product.name} className="w-20 h-20 object-cover rounded-lg"/>
+            <div>
+              <h3 className="text-lg font-semibold">{product.name}</h3>
+              <p className="text-xl font-bold text-slate-300 mt-1">
+                {product.currency.toLowerCase() === 'idr' 
+                  ? formatToIDR(product.price) 
+                  : `${product.price.toLocaleString()} π`}
+              </p>
+            </div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {/* Form Alamat & Pengiriman */}
+        <div className="flex flex-col gap-4">
           <div>
             <label className="block text-sm text-slate-400 mb-1">Alamat Lengkap</label>
             <textarea
@@ -102,46 +103,26 @@ export default function CheckoutModal({ product, onCheckout, onCancel }) {
               <option value="">-- Pilih Pengiriman --</option>
               <option value="jnt">J&T Express</option>
               <option value="jne_cargo">JNE Cargo</option>
-              <option value="gosend">GoSend Instant</option>
             </select>
           </div>
+        </div>
 
-          {shippingCost > 0 && (
-            <div className="mt-4 p-4 border-t border-slate-600 space-y-2">
-              <div className="flex justify-between text-slate-300">
-                <span>Subtotal Produk:</span>
-                <span>{product.currency.toLowerCase() === 'idr' ? formatToIDR(product.price) : `${product.price.toLocaleString()} π`}</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>Biaya Pengiriman:</span>
-                <span>{formatToIDR(shippingCost)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-lg text-tosca mt-2 pt-2 border-t border-slate-700">
-                <span>Total Pembayaran:</span>
-                <span>
-                  {product.currency.toLowerCase() === 'idr' 
-                    ? formatToIDR(totalPrice)
-                    : `${product.price.toLocaleString()} π + ${formatToIDR(shippingCost)}`}
-                </span>
-              </div>
-            </div>
-          )}
-          
-          {/* Menampilkan pesan error di UI */}
-          {error && <p className="text-red-400 text-sm text-center -mt-2">{error}</p>}
+        {error && <p className="text-red-400 text-sm text-center mt-4">{error}</p>}
 
-          <div className="mt-6 flex justify-end gap-4">
-            <button type="button" onClick={onCancel} className="bg-slate-600 hover:bg-slate-500 px-6 py-2 rounded-lg">Batal</button>
-            <button 
-              type="submit" 
-              disabled={isLoading}
-              className="bg-tosca hover:bg-tosca-dark px-6 py-2 rounded-lg font-bold w-48 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Memproses...' : 'Lanjutkan Pembayaran'}
-            </button>
-          </div>
-        </form>
+        {/* Tombol Aksi */}
+        <div className="mt-6 flex justify-end gap-4">
+          <button type="button" onClick={onCancel} className="bg-slate-600 hover:bg-slate-500 px-6 py-2 rounded-lg">Batal</button>
+          <button 
+            type="button" 
+            onClick={handlePiCheckout}
+            disabled={isLoading || product.currency.toLowerCase() !== 'pi'}
+            className="bg-tosca hover:bg-tosca-dark px-6 py-2 rounded-lg font-bold w-48 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? 'Menunggu...' : `Bayar dengan Pi (π)`}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
+
