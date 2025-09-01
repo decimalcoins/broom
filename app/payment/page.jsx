@@ -1,19 +1,20 @@
+
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+// Pastikan impor ini benar
 import { useAppContext } from "@/context/PiContext";
 
 export default function PaymentPage() {
   const router = useRouter();
-  // Dapatkan fungsi dan state yang dibutuhkan dari context
+  // Pastikan hook yang digunakan di sini adalah useAppContext
   const { createPayment, isSdkReady, setIsAdmin } = useAppContext();
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Fungsi ini sekarang akan memanggil Pi SDK
   const handlePayment = async () => {
     if (!isSdkReady) {
       setError("Pi SDK sedang dimuat, coba lagi sebentar.");
@@ -32,7 +33,6 @@ export default function PaymentPage() {
     const callbacks = {
       onReadyForServerApproval: (paymentId) => {
         console.log('Aktivasi penjual siap disetujui, paymentId:', paymentId);
-        // Di aplikasi nyata, Anda akan memvalidasi ini di backend
         alert("Pembayaran 0.001 Pi berhasil! Akun Anda sekarang telah diaktifkan sebagai penjual.");
         setIsAdmin(true);
         router.push("/admin");
