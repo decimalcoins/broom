@@ -1,49 +1,39 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useAppContext } from '@/context/PiContext';
 
 export default function LoginModal({ onRoleSelected, onCancel }) {
+  // Dapatkan fungsi 'createPayment' yang baru dari context
+  const { authenticate, createPayment, isSdkReady, setIsAdmin } = useAppContext(); 
+  
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isPiReady, setIsPiReady] = useState(false);
 
-  // useEffect untuk memeriksa ketersediaan Pi SDK setelah komponen dimuat di klien
-  useEffect(() => {
-    if (window.Pi) {
-      setIsPiReady(true);
-    }
-  }, []);
-
-  // Fungsi untuk menangani autentikasi pengguna Pi
   const handleUserLogin = async () => {
-    if (!isPiReady) {
-      setError('Pi SDK belum siap. Coba lagi sebentar.');
+    if (!isSdkReady) {
+      setError("Pi SDK sedang dimuat, coba lagi sebentar.");
       return;
     }
     setIsLoading(true);
     setError('');
-
-    const scopes = ['username'];
     try {
-      const authResult = await window.Pi.authenticate(scopes, (payment) => {
-        // Logika ini bisa dikosongkan jika tidak ada pembayaran saat autentikasi
-        console.log('onIncompletePaymentFound:', payment);
-      });
-      console.log('Autentikasi berhasil:', authResult);
-      onRoleSelected('user', authResult.user);
+      const userData = await authenticate();
+      onRoleSelected('user', userData);
     } catch (err) {
-      console.error('Gagal autentikasi:', err);
       setError('Gagal melakukan autentikasi dengan Pi.');
+    } finally {
       setIsLoading(false);
     }
   };
 
-  // Fungsi untuk menangani pembayaran pendaftaran admin
+  // === DIPERBARUI: Mengembalikan logika pembayaran untuk Admin ===
   const handleAdminRegistration = async () => {
-    if (!isPiReady) {
-      setError('Pi SDK belum siap. Coba lagi sebentar.');
+    if (!isSdkReady) {
+      setError("Pi SDK sedang dimuat, coba lagi sebentar.");
       return;
     }
+    
     setIsLoading(true);
     setError('');
 
@@ -55,17 +45,15 @@ export default function LoginModal({ onRoleSelected, onCancel }) {
 
     const callbacks = {
       onReadyForServerApproval: (paymentId) => {
-        console.log('Pendaftaran admin siap untuk disetujui, paymentId:', paymentId);
+        console.log('Pendaftaran admin siap disetujui, paymentId:', paymentId);
+        setIsAdmin(true);
         onRoleSelected('admin');
       },
-      onReadyForServerCompletion: (paymentId, txid) => {
-        console.log('Pendaftaran admin siap untuk diselesaikan', { paymentId, txid });
-      },
-      onCancel: (paymentId) => {
-        console.log('Pendaftaran admin dibatalkan', { paymentId });
+      onCancel: () => {
+        console.log('Pendaftaran admin dibatalkan.');
         setIsLoading(false);
       },
-      onError: (error, payment) => {
+      onError: (error) => {
         console.error('Error pendaftaran admin:', error);
         setError('Gagal memproses pembayaran pendaftaran.');
         setIsLoading(false);
@@ -73,10 +61,11 @@ export default function LoginModal({ onRoleSelected, onCancel }) {
     };
 
     try {
-      await window.Pi.createPayment(paymentData, callbacks);
+      // Panggil fungsi 'createPayment' dari context
+      await createPayment(paymentData, callbacks);
     } catch (err) {
-      console.error('Gagal memanggil Pi SDK:', err);
-      setError('Gagal memulai SDK Pi. Pastikan Anda di Pi Browser.');
+      console.error('Gagal memanggil createPayment:', err);
+      setError('Gagal memulai proses pembayaran.');
       setIsLoading(false);
     }
   };
@@ -95,7 +84,7 @@ export default function LoginModal({ onRoleSelected, onCancel }) {
         <div className="flex flex-col gap-4">
           <button 
             onClick={handleUserLogin}
-            disabled={isLoading || !isPiReady}
+            disabled={isLoading || !isSdkReady}
             className="w-full bg-slate-700 hover:bg-slate-600 p-4 rounded-lg text-left disabled:opacity-50"
           >
             <h3 className="font-bold">User</h3>
@@ -104,10 +93,11 @@ export default function LoginModal({ onRoleSelected, onCancel }) {
           
           <button 
             onClick={handleAdminRegistration}
-            disabled={isLoading || !isPiReady}
+            disabled={isLoading || !isSdkReady}
             className="w-full bg-slate-700 hover:bg-slate-600 p-4 rounded-lg text-left disabled:opacity-50"
           >
             <h3 className="font-bold">Admin</h3>
+            {/* Teks dikembalikan seperti semula */}
             <p className="text-sm text-slate-400">Bayar 0.001 π untuk mengelola produk dan toko.</p>
           </button>
         </div>

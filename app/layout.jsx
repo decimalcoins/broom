@@ -1,6 +1,6 @@
-import Script from 'next/script';
+import { PiProvider } from '@/context/PiContext'; // <-- Nama yang diimpor adalah PiProvider
 import './globals.css';
-import Footer from '@/components/Footer'; // <-- Mengimpor Footer
+import Footer from '@/components/Footer';
 
 export const metadata = {
   title: "Broom Marketplace",
@@ -10,28 +10,14 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="id">
-      {/* Menambahkan class untuk layout dan latar belakang */}
       <body className="min-h-screen text-white bg-slate-900 flex flex-col">
-        {/* Wrapper ini memastikan footer menempel di bawah */}
-        <div className="flex-grow">
-          {children}
-        </div>
-        
-        <Footer /> {/* <-- Menampilkan komponen Footer di sini */}
-
-        {/* Skrip untuk memuat dan menginisialisasi Pi Network SDK */}
-        <Script 
-          src="https://sdk.minepi.com/pi-sdk.js" 
-          strategy="beforeInteractive" 
-        />
-        <Script id="pi-init" strategy="afterInteractive">
-          {`
-            // Pengecekan keamanan untuk memastikan window.Pi ada sebelum dijalankan
-            if (window.Pi) {
-              window.Pi.init({ version: "2.0", sandbox: true });
-            }
-          `}
-        </Script>
+        {/* Gunakan nama yang benar di sini: PiProvider */}
+        <PiProvider>
+          <div className="flex-grow">
+            {children}
+          </div>
+          <Footer />
+        </PiProvider>
       </body>
     </html>
   );

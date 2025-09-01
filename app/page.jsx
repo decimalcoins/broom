@@ -1,71 +1,58 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic'; // <-- 1. Import 'dynamic'
+import dynamic from 'next/dynamic';
+import { useAppContext } from '@/context/PiContext'; // <-- 1. Impor hook useAppContext
 import Splash from '@/components/Splash';
 import ProductCard from '@/components/ProductCard';
-import ChatModal from '@/components/ChatModal';
 
-// 2. Gunakan dynamic import untuk memuat modal hanya di sisi klien
-const DynamicLoginModal = dynamic(() => import('@/components/LoginModal'), { 
-  ssr: false, // <-- Ini adalah bagian terpenting: menonaktifkan Server-Side Rendering
-  loading: () => <p className="text-center">Memuat modal...</p> // Tampilan loading opsional
-});
-
-const DynamicCheckoutModal = dynamic(() => import('@/components/CheckoutModal'), {
-  ssr: false,
-  loading: () => <p className="text-center">Memuat modal...</p>
-});
+// Gunakan dynamic import untuk memuat modal hanya di sisi klien
+const DynamicLoginModal = dynamic(() => import('@/components/LoginModal'), { ssr: false });
+const DynamicCheckoutModal = dynamic(() => import('@/components/CheckoutModal'), { ssr: false });
+const DynamicChatModal = dynamic(() => import('@/components/ChatModal'), { ssr: false });
 
 
 export default function HomePage() {
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [products, setProducts] = useState([]);
-  const [showModal, setShowModal] = useState(false);
   
-  // State baru untuk menyimpan data user
-  const [user, setUser] = useState(null); 
+  // 2. Dapatkan state dan fungsi dari context
+  const { user, logout } = useAppContext(); 
   
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [checkoutProduct, setCheckoutProduct] = useState(null);
   const [chatProduct, setChatProduct] = useState(null);
 
-  // Mengambil data produk dari API saat komponen dimuat
+  // Mengambil data produk dari API
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const response = await fetch('/api/products');
-        if (!response.ok) {
-          throw new Error('Gagal mengambil data produk');
-        }
         const data = await response.json();
         setProducts(data);
       } catch (error) {
-        console.error(error);
+        console.error("Gagal mengambil produk:", error);
       }
     };
     fetchProducts();
   }, []);
 
+  // Timer untuk splash screen
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 3000); 
+    const timer = setTimeout(() => setInitialLoading(false), 3000); 
     return () => clearTimeout(timer);
   }, []);
-
-  // Diperbarui untuk menerima data user dari LoginModal
-  const handleRoleSelected = (role, userData = null) => {
-    if (role === 'admin') {
-      window.location.href = '/admin';
-      return;
-    }
-    // Simpan data user dan role ke state
-    setUser({ role, ...userData });
-    setShowModal(false);
-  };
   
-  const handleLogout = () => {
-    setUser(null);
+  // 3. Fungsi handleRoleSelected sekarang jauh lebih sederhana
+  // Karena state user sudah diatur di dalam context, kita hanya perlu menutup modal
+  const handleRoleSelected = (role, userData) => {
+    // Logika untuk menyimpan user sudah ditangani oleh 'authenticate' di dalam context
+    // Logika untuk admin juga sudah ditangani di dalam LoginModal
+    setShowLoginModal(false);
+    if (role === 'admin') {
+      // Redirect ke halaman admin jika rolenya admin
+      window.location.href = '/admin';
+    }
   };
 
   const handleBuy = (product) => {
@@ -76,7 +63,6 @@ export default function HomePage() {
     setChatProduct(product);
   };
 
-  // Diperbarui untuk menangani dua jenis checkout
   const handleCheckout = async (checkoutData) => {
     try {
       const response = await fetch('/api/checkout', {
@@ -84,61 +70,50 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(checkoutData),
       });
-
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
-
-      alert(result.message); // Menampilkan pesan sukses dari backend
+      alert(result.message);
       setCheckoutProduct(null);
-
     } catch (error) {
-      console.error('Error saat checkout:', error);
       alert(`Error: ${error.message}`);
     }
   };
   
   const handleSendMessage = async (message) => {
     try {
-      const response = await fetch('/api/chat', {
+      await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, productId: chatProduct.id }),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message);
-      // Pesan dikirim, tidak perlu alert di sini
-      console.log(result.message);
     } catch (error) {
       console.error('Error saat mengirim pesan:', error);
     }
   };
 
   const renderContent = () => {
-    if (user && user.role === 'user') {
+    // 4. Gunakan 'user' dari context untuk menentukan apa yang ditampilkan
+    if (user) { 
       return (
         <div>
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-2xl font-bold text-white">Produk untuk Anda</h2>
-              {/* Menampilkan username jika ada */}
-              {user.username && <p className="text-slate-400">Selamat datang, @{user.username}!</p>}
+              <p className="text-slate-400">Selamat datang, @{user.username}!</p>
             </div>
-            <button onClick={handleLogout} className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>
+            {/* 5. Gunakan fungsi 'logout' dari context */}
+            <button onClick={logout} className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {products.length > 0 ? (
-              products.map(product => (
-                <ProductCard 
-                  key={product.id} 
-                  product={product} 
-                  onBuy={handleBuy}
-                  onChat={handleChat}
-                  user={user.role}
-                />
-              ))
-            ) : (
-              <p>Memuat produk...</p>
-            )}
+            {products.map(product => (
+              <ProductCard 
+                key={product.id} 
+                product={product} 
+                onBuy={handleBuy}
+                onChat={handleChat}
+                user={user.role}
+              />
+            ))}
           </div>
         </div>
       );
@@ -149,7 +124,7 @@ export default function HomePage() {
             <h2 className="text-2xl font-bold text-tosca">Selamat Datang di Broom Marketplace!</h2>
             <p className="text-slate-400 mt-2 mb-6">Silakan masuk untuk melihat produk.</p>
             <button 
-                onClick={() => setShowModal(true)}
+                onClick={() => setShowLoginModal(true)}
                 className="bg-tosca hover:bg-tosca-dark text-white font-bold py-2 px-6 rounded-lg text-lg"
             >
                 Masuk
@@ -158,17 +133,16 @@ export default function HomePage() {
     );
   };
 
-  if (loading) {
+  if (initialLoading) {
     return <Splash />;
   }
 
   return (
     <main className="min-h-screen p-6">
-      {showModal && (
-        // 3. Render versi dinamis dari modal
+      {showLoginModal && (
         <DynamicLoginModal 
           onRoleSelected={handleRoleSelected}
-          onCancel={() => setShowModal(false)}
+          onCancel={() => setShowLoginModal(false)}
         />
       )}
       
@@ -181,7 +155,7 @@ export default function HomePage() {
       )}
 
       {chatProduct && (
-        <ChatModal
+        <DynamicChatModal
             product={chatProduct}
             onSend={handleSendMessage}
             onCancel={() => setChatProduct(null)}
