@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+// === PERBAIKAN: Menggunakan nama hook yang benar ===
 import { useAppContext } from '@/context/PiContext';
 
 export default function LoginModal({ onRoleSelected, onCancel }) {
-  // Dapatkan fungsi 'createPayment' yang baru dari context
+  // === PERBAIKAN: Menggunakan nama hook yang benar ===
   const { authenticate, createPayment, isSdkReady, setIsAdmin } = useAppContext(); 
   
   const [error, setError] = useState('');
@@ -27,7 +28,6 @@ export default function LoginModal({ onRoleSelected, onCancel }) {
     }
   };
 
-  // === DIPERBARUI: Mengembalikan logika pembayaran untuk Admin ===
   const handleAdminRegistration = async () => {
     if (!isSdkReady) {
       setError("Pi SDK sedang dimuat, coba lagi sebentar.");
@@ -61,7 +61,6 @@ export default function LoginModal({ onRoleSelected, onCancel }) {
     };
 
     try {
-      // Panggil fungsi 'createPayment' dari context
       await createPayment(paymentData, callbacks);
     } catch (err) {
       console.error('Gagal memanggil createPayment:', err);
@@ -97,7 +96,6 @@ export default function LoginModal({ onRoleSelected, onCancel }) {
             className="w-full bg-slate-700 hover:bg-slate-600 p-4 rounded-lg text-left disabled:opacity-50"
           >
             <h3 className="font-bold">Admin</h3>
-            {/* Teks dikembalikan seperti semula */}
             <p className="text-sm text-slate-400">Bayar 0.001 π untuk mengelola produk dan toko.</p>
           </button>
         </div>
