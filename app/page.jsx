@@ -1,59 +1,71 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import LoginModal from '@/components/LoginModal';
+import dynamic from 'next/dynamic'; // <-- 1. Import 'dynamic'
 import Splash from '@/components/Splash';
 import ProductCard from '@/components/ProductCard';
-import CheckoutModal from '@/components/CheckoutModal';
 import ChatModal from '@/components/ChatModal';
+
+// 2. Gunakan dynamic import untuk memuat modal hanya di sisi klien
+const DynamicLoginModal = dynamic(() => import('@/components/LoginModal'), { 
+  ssr: false, // <-- Ini adalah bagian terpenting: menonaktifkan Server-Side Rendering
+  loading: () => <p className="text-center">Memuat modal...</p> // Tampilan loading opsional
+});
+
+const DynamicCheckoutModal = dynamic(() => import('@/components/CheckoutModal'), {
+  ssr: false,
+  loading: () => <p className="text-center">Memuat modal...</p>
+});
+
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [role, setRole] = useState(null);
   const [products, setProducts] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  
+  // State baru untuk menyimpan data user
+  const [user, setUser] = useState(null); 
+  
   const [checkoutProduct, setCheckoutProduct] = useState(null);
   const [chatProduct, setChatProduct] = useState(null);
-  const [piUser, setPiUser] = useState(null);
 
-  // Mengambil data produk dari backend
+  // Mengambil data produk dari API saat komponen dimuat
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const response = await fetch('/api/products');
+        if (!response.ok) {
+          throw new Error('Gagal mengambil data produk');
+        }
         const data = await response.json();
         setProducts(data);
       } catch (error) {
-        console.error("Gagal mengambil data produk:", error);
+        console.error(error);
       }
     };
     fetchProducts();
   }, []);
-  
-  // Efek untuk splash screen
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(false);
-      setShowModal(true);
-    }, 5000);
+    }, 3000); 
     return () => clearTimeout(timer);
   }, []);
 
-  const handleRoleSelected = (selectedRole, userData = null) => {
-    setRole(selectedRole);
-    setShowModal(false);
-    if (userData) {
-      setPiUser(userData);
-    }
-    if (selectedRole === 'admin') {
+  // Diperbarui untuk menerima data user dari LoginModal
+  const handleRoleSelected = (role, userData = null) => {
+    if (role === 'admin') {
       window.location.href = '/admin';
+      return;
     }
+    // Simpan data user dan role ke state
+    setUser({ role, ...userData });
+    setShowModal(false);
   };
   
   const handleLogout = () => {
-    setRole(null);
-    setPiUser(null);
-    setShowModal(true);
+    setUser(null);
   };
 
   const handleBuy = (product) => {
@@ -64,10 +76,9 @@ export default function HomePage() {
     setChatProduct(product);
   };
 
-  // === DIPERBARUI: Fungsi ini sekarang menangani semua jenis checkout ===
+  // Diperbarui untuk menangani dua jenis checkout
   const handleCheckout = async (checkoutData) => {
     try {
-      // Data checkout (baik dari Pi maupun bank) langsung dikirim ke backend
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -75,16 +86,14 @@ export default function HomePage() {
       });
 
       const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
 
-      if (response.ok) {
-        alert(result.message); // Menampilkan pesan sukses dari backend
-        setCheckoutProduct(null); // Tutup modal
-      } else {
-        alert(`Error: ${result.message}`);
-      }
+      alert(result.message); // Menampilkan pesan sukses dari backend
+      setCheckoutProduct(null);
+
     } catch (error) {
-      console.error("Gagal mengirim data checkout:", error);
-      alert("Terjadi kesalahan koneksi.");
+      console.error('Error saat checkout:', error);
+      alert(`Error: ${error.message}`);
     }
   };
   
@@ -95,32 +104,41 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, productId: chatProduct.id }),
       });
-      if (!response.ok) throw new Error("Gagal mengirim pesan");
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      // Pesan dikirim, tidak perlu alert di sini
+      console.log(result.message);
     } catch (error) {
-      console.error(error);
+      console.error('Error saat mengirim pesan:', error);
     }
   };
 
   const renderContent = () => {
-    if (role === 'user') {
+    if (user && user.role === 'user') {
       return (
         <div>
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-white">
-              {piUser ? `Selamat datang, @${piUser.username}!` : 'Produk untuk Anda'}
-            </h2>
+            <div>
+              <h2 className="text-2xl font-bold text-white">Produk untuk Anda</h2>
+              {/* Menampilkan username jika ada */}
+              {user.username && <p className="text-slate-400">Selamat datang, @{user.username}!</p>}
+            </div>
             <button onClick={handleLogout} className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {products.map(product => (
-              <ProductCard 
-                key={product.id} 
-                product={product} 
-                onBuy={handleBuy}
-                onChat={handleChat}
-                user={role}
-              />
-            ))}
+            {products.length > 0 ? (
+              products.map(product => (
+                <ProductCard 
+                  key={product.id} 
+                  product={product} 
+                  onBuy={handleBuy}
+                  onChat={handleChat}
+                  user={user.role}
+                />
+              ))
+            ) : (
+              <p>Memuat produk...</p>
+            )}
           </div>
         </div>
       );
@@ -131,10 +149,10 @@ export default function HomePage() {
             <h2 className="text-2xl font-bold text-tosca">Selamat Datang di Broom Marketplace!</h2>
             <p className="text-slate-400 mt-2 mb-6">Silakan masuk untuk melihat produk.</p>
             <button 
-              onClick={() => setShowModal(true)}
-              className="bg-tosca hover:bg-tosca-dark text-white font-bold py-2 px-6 rounded-lg text-lg"
+                onClick={() => setShowModal(true)}
+                className="bg-tosca hover:bg-tosca-dark text-white font-bold py-2 px-6 rounded-lg text-lg"
             >
-              Masuk
+                Masuk
             </button>
         </div>
     );
@@ -147,14 +165,15 @@ export default function HomePage() {
   return (
     <main className="min-h-screen p-6">
       {showModal && (
-        <LoginModal 
+        // 3. Render versi dinamis dari modal
+        <DynamicLoginModal 
           onRoleSelected={handleRoleSelected}
           onCancel={() => setShowModal(false)}
         />
       )}
       
       {checkoutProduct && (
-        <CheckoutModal
+        <DynamicCheckoutModal
             product={checkoutProduct}
             onCheckout={handleCheckout}
             onCancel={() => setCheckoutProduct(null)}
