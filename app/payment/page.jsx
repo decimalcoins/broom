@@ -2,11 +2,11 @@
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { useApp } from "@/context/PiContext";
+import { useAppContext } from "@/context/PiContext";
 
 export default function PaymentPage() {
   const router = useRouter();
-  const { setIsAdmin } = useApp();
+  const { setIsAdmin } = useAppContext();
 
   const handlePayment = () => {
     alert("Pembayaran 0.001 Pi berhasil! Akun Anda sekarang telah diaktifkan sebagai penjual.");
