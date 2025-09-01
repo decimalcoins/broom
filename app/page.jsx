@@ -14,11 +14,9 @@ export default function HomePage() {
   const [products, setProducts] = useState([]);
   const [checkoutProduct, setCheckoutProduct] = useState(null);
   const [chatProduct, setChatProduct] = useState(null);
-  
-  // === 1. State baru untuk menyimpan data pengguna Pi ===
   const [piUser, setPiUser] = useState(null);
 
-  // Mengambil data produk dari backend saat komponen dimuat
+  // Mengambil data produk dari backend
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -41,25 +39,20 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // === 2. Perbarui fungsi ini untuk menerima data pengguna ===
   const handleRoleSelected = (selectedRole, userData = null) => {
     setRole(selectedRole);
     setShowModal(false);
-    
-    // Simpan data pengguna jika ada
     if (userData) {
       setPiUser(userData);
     }
-
     if (selectedRole === 'admin') {
       window.location.href = '/admin';
     }
   };
   
-  // === 3. Perbarui fungsi logout untuk membersihkan data pengguna ===
   const handleLogout = () => {
     setRole(null);
-    setPiUser(null); // Hapus data pengguna saat logout
+    setPiUser(null);
     setShowModal(true);
   };
 
@@ -71,21 +64,23 @@ export default function HomePage() {
     setChatProduct(product);
   };
 
+  // === DIPERBARUI: Fungsi ini sekarang menangani semua jenis checkout ===
   const handleCheckout = async (checkoutData) => {
     try {
+      // Data checkout (baik dari Pi maupun bank) langsung dikirim ke backend
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(checkoutData),
       });
 
+      const result = await response.json();
+
       if (response.ok) {
-        const result = await response.json();
         alert(result.message); // Menampilkan pesan sukses dari backend
         setCheckoutProduct(null); // Tutup modal
       } else {
-        const errorResult = await response.json();
-        alert(`Error: ${errorResult.message}`);
+        alert(`Error: ${result.message}`);
       }
     } catch (error) {
       console.error("Gagal mengirim data checkout:", error);
@@ -111,7 +106,6 @@ export default function HomePage() {
       return (
         <div>
           <div className="flex justify-between items-center mb-6">
-            {/* === 4. Tampilkan nama pengguna jika sudah login === */}
             <h2 className="text-2xl font-bold text-white">
               {piUser ? `Selamat datang, @${piUser.username}!` : 'Produk untuk Anda'}
             </h2>
