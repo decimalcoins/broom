@@ -6,21 +6,33 @@ import Splash from '@/components/Splash';
 import ProductCard from '@/components/ProductCard';
 import CheckoutModal from '@/components/CheckoutModal';
 import ChatModal from '@/components/ChatModal';
-// Hapus import dummyProducts karena data akan diambil dari API
-// import { dummyProducts } from '@/lib/constants'; 
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [role, setRole] = useState(null);
+  const [products, setProducts] = useState([]);
   const [checkoutProduct, setCheckoutProduct] = useState(null);
   const [chatProduct, setChatProduct] = useState(null);
+  
+  // === 1. State baru untuk menyimpan data pengguna Pi ===
+  const [piUser, setPiUser] = useState(null);
 
-  // === PERUBAHAN 1: State untuk menampung data produk dari backend ===
-  const [products, setProducts] = useState([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
-
-  // useEffect untuk splash screen
+  // Mengambil data produk dari backend saat komponen dimuat
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch('/api/products');
+        const data = await response.json();
+        setProducts(data);
+      } catch (error) {
+        console.error("Gagal mengambil data produk:", error);
+      }
+    };
+    fetchProducts();
+  }, []);
+  
+  // Efek untuk splash screen
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(false);
@@ -29,34 +41,25 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // === PERUBAHAN 2: useEffect baru untuk mengambil data produk dari API ===
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoadingProducts(true);
-        const response = await fetch('/api/products');
-        const data = await response.json();
-        setProducts(data);
-      } catch (error) {
-        console.error("Gagal mengambil data produk:", error);
-      } finally {
-        setLoadingProducts(false);
-      }
-    };
-
-    fetchProducts();
-  }, []);
-
-  const handleRoleSelected = (selectedRole) => {
+  // === 2. Perbarui fungsi ini untuk menerima data pengguna ===
+  const handleRoleSelected = (selectedRole, userData = null) => {
     setRole(selectedRole);
     setShowModal(false);
+    
+    // Simpan data pengguna jika ada
+    if (userData) {
+      setPiUser(userData);
+    }
+
     if (selectedRole === 'admin') {
       window.location.href = '/admin';
     }
   };
   
+  // === 3. Perbarui fungsi logout untuk membersihkan data pengguna ===
   const handleLogout = () => {
     setRole(null);
+    setPiUser(null); // Hapus data pengguna saat logout
     setShowModal(true);
   };
 
@@ -68,40 +71,38 @@ export default function HomePage() {
     setChatProduct(product);
   };
 
-  // === PERUBAHAN 3: Fungsi checkout diubah untuk mengirim data ke backend ===
   const handleCheckout = async (checkoutData) => {
     try {
       const response = await fetch('/api/checkout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(checkoutData),
       });
 
-      const result = await response.json();
-      console.log('Respon dari server checkout:', result.message);
-      alert('Pembelian berhasil diproses!');
-
+      if (response.ok) {
+        const result = await response.json();
+        alert(result.message); // Menampilkan pesan sukses dari backend
+        setCheckoutProduct(null); // Tutup modal
+      } else {
+        const errorResult = await response.json();
+        alert(`Error: ${errorResult.message}`);
+      }
     } catch (error) {
-      console.error('Gagal melakukan checkout:', error);
-      alert('Maaf, terjadi kesalahan saat memproses pembelian.');
-    } finally {
-      setCheckoutProduct(null);
+      console.error("Gagal mengirim data checkout:", error);
+      alert("Terjadi kesalahan koneksi.");
     }
   };
   
-  // === PERUBAHAN 4: Fungsi chat diubah untuk mengirim data ke backend ===
-  const handleSendMessage = async (message, product) => {
+  const handleSendMessage = async (message) => {
     try {
-      await fetch('/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, productId: product.id }),
+        body: JSON.stringify({ message, productId: chatProduct.id }),
       });
-      console.log("Pesan terkirim ke server");
+      if (!response.ok) throw new Error("Gagal mengirim pesan");
     } catch (error) {
-      console.error("Gagal mengirim pesan:", error);
+      console.error(error);
     }
   };
 
@@ -110,26 +111,23 @@ export default function HomePage() {
       return (
         <div>
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-white">Produk untuk Anda</h2>
+            {/* === 4. Tampilkan nama pengguna jika sudah login === */}
+            <h2 className="text-2xl font-bold text-white">
+              {piUser ? `Selamat datang, @${piUser.username}!` : 'Produk untuk Anda'}
+            </h2>
             <button onClick={handleLogout} className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>
           </div>
-          {/* Tambahkan pengecekan loadingProducts */}
-          {loadingProducts ? (
-            <div className="text-center text-white">Memuat produk...</div>
-          ) : (
-            // === PERUBAHAN 5: Ganti `dummyProducts` dengan state `products` ===
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {products.map(product => (
-                <ProductCard 
-                  key={product.id} 
-                  product={product} 
-                  onBuy={handleBuy}
-                  onChat={handleChat}
-                  user={role}
-                />
-              ))}
-            </div>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {products.map(product => (
+              <ProductCard 
+                key={product.id} 
+                product={product} 
+                onBuy={handleBuy}
+                onChat={handleChat}
+                user={role}
+              />
+            ))}
+          </div>
         </div>
       );
     }
@@ -139,10 +137,10 @@ export default function HomePage() {
             <h2 className="text-2xl font-bold text-tosca">Selamat Datang di Broom Marketplace!</h2>
             <p className="text-slate-400 mt-2 mb-6">Silakan masuk untuk melihat produk.</p>
             <button 
-                onClick={() => setShowModal(true)}
-                className="bg-tosca hover:bg-tosca-dark text-white font-bold py-2 px-6 rounded-lg text-lg"
+              onClick={() => setShowModal(true)}
+              className="bg-tosca hover:bg-tosca-dark text-white font-bold py-2 px-6 rounded-lg text-lg"
             >
-                Masuk
+              Masuk
             </button>
         </div>
     );
@@ -172,8 +170,7 @@ export default function HomePage() {
       {chatProduct && (
         <ChatModal
             product={chatProduct}
-            // === PERUBAHAN 6: Sesuaikan pemanggilan onSend di ChatModal ===
-            onSend={(message) => handleSendMessage(message, chatProduct)}
+            onSend={handleSendMessage}
             onCancel={() => setChatProduct(null)}
         />
       )}

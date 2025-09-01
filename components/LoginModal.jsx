@@ -6,54 +6,79 @@ export default function LoginModal({ onRoleSelected, onCancel }) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fungsi untuk menangani pembayaran pendaftaran admin
-  const handleAdminRegistration = async () => {
+  // Fungsi baru untuk menangani login sebagai user
+  const handleUserLogin = async () => {
     setIsLoading(true);
     setError('');
 
-    // 1. Definisikan detail pembayaran
+    try {
+      // 1. Tentukan scope izin yang diminta (dalam kasus ini, username)
+      const scopes = ['username'];
+
+      // Fungsi ini akan dipanggil jika ada pembayaran yang belum selesai
+      const onIncompletePaymentFound = (payment) => {
+        console.log('Ditemukan pembayaran yang belum selesai:', payment);
+        // Anda bisa menambahkan logika di sini untuk menyelesaikan pembayaran lama tersebut
+        return; 
+      };
+
+      // 2. Panggil fungsi autentikasi Pi untuk meminta izin
+      const authResult = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+      
+      console.log('Autentikasi berhasil, data pengguna:', authResult.user);
+
+      // 3. Setelah berhasil, teruskan ke halaman utama sebagai 'user'
+      // Anda juga bisa mengirim 'authResult.user' jika perlu data user di halaman utama
+      onRoleSelected('user');
+
+    } catch (err) {
+      console.error('Gagal melakukan autentikasi Pi:', err);
+      if (err.error === 'user_cancelled') {
+        // Jika pengguna menekan tombol batal
+        setError('Proses masuk dibatalkan.');
+      } else {
+        setError('Gagal memulai SDK Pi. Pastikan Anda di Pi Browser.');
+      }
+      setIsLoading(false);
+    }
+    // isLoading akan otomatis berhenti karena modal tertutup setelah onRoleSelected
+  };
+
+  // Fungsi untuk menangani pembayaran pendaftaran admin (tetap sama)
+  const handleAdminRegistration = async () => {
+    setIsLoading(true);
+    setError('');
+    
     const paymentData = {
-      amount: 0.001, // Biaya pendaftaran
+      amount: 0.001,
       memo: 'Pendaftaran Admin Broom Marketplace',
       metadata: { type: 'admin_registration' },
     };
 
-    // 2. Definisikan SEMUA fungsi callback yang dibutuhkan
     const callbacks = {
       onReadyForServerApproval: (paymentId) => {
-        // Untuk pendaftaran sederhana, kita bisa langsung anggap berhasil di frontend
-        // Idealnya, Anda juga mengirim paymentId ini ke backend untuk dicatat
         console.log('Pendaftaran admin siap untuk disetujui, paymentId:', paymentId);
-        onRoleSelected('admin'); // Langsung teruskan ke halaman admin
+        onRoleSelected('admin');
       },
       onReadyForServerCompletion: (paymentId, txid) => {
-        // Backend yang akan menangani ini, bisa dikosongkan di frontend
         console.log('Pendaftaran admin siap untuk diselesaikan', { paymentId, txid });
       },
       onCancel: (paymentId) => {
-        // Pengguna membatalkan pembayaran
         console.log('Pendaftaran admin dibatalkan', { paymentId });
         setIsLoading(false);
       },
       onError: (error, payment) => {
-        // Terjadi error saat proses pembayaran
         console.error('Error pendaftaran admin:', error);
         setError('Gagal memproses pembayaran pendaftaran.');
         setIsLoading(false);
       },
     };
 
-    // 3. Panggil Pi SDK dengan data dan callback
     try {
       await window.Pi.createPayment(paymentData, callbacks);
     } catch (err) {
       console.error('Gagal memanggil Pi SDK:', err);
-      // Cek apakah error karena callback hilang, meskipun seharusnya sudah diperbaiki
-      if (err.message.includes('callback')) {
-          setError('Terjadi kesalahan teknis (callback error).');
-      } else {
-          setError('Gagal memulai SDK Pi. Pastikan Anda di Pi Browser.');
-      }
+      setError('Gagal memulai SDK Pi. Pastikan Anda di Pi Browser.');
       setIsLoading(false);
     }
   };
@@ -63,7 +88,6 @@ export default function LoginModal({ onRoleSelected, onCancel }) {
       <div className="bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-sm text-white">
         <h2 className="text-2xl font-bold text-center mb-6">Masuk Sebagai</h2>
         
-        {/* Pesan Error */}
         {error && (
           <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-2 rounded-lg mb-4 text-sm text-center">
             {error}
@@ -71,10 +95,11 @@ export default function LoginModal({ onRoleSelected, onCancel }) {
         )}
 
         <div className="flex flex-col gap-4">
-          {/* Tombol User */}
+          {/* Tombol User sekarang memanggil handleUserLogin */}
           <button 
-            onClick={() => onRoleSelected('user')}
-            className="w-full bg-slate-700 hover:bg-slate-600 p-4 rounded-lg text-left"
+            onClick={handleUserLogin}
+            disabled={isLoading}
+            className="w-full bg-slate-700 hover:bg-slate-600 p-4 rounded-lg text-left disabled:opacity-50 disabled:cursor-wait"
           >
             <h3 className="font-bold">User</h3>
             <p className="text-sm text-slate-400">Masuk untuk melihat dan membeli produk.</p>
@@ -101,3 +126,4 @@ export default function LoginModal({ onRoleSelected, onCancel }) {
     </div>
   );
 }
+
