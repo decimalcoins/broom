@@ -1,10 +1,9 @@
-
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-// Pastikan impor ini benar
+// Pastikan impor ini menggunakan useAppContext
 import { useAppContext } from "@/context/PiContext";
 
 export default function PaymentPage() {
