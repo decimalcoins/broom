@@ -19,27 +19,56 @@ export function PiProvider({ children }) {
     return () => { delete window.handlePiSdkReady; };
   }, []);
 
+  // --- DIPERBARUI: Meminta semua izin di awal untuk stabilitas ---
   const authenticate = async () => {
     if (!isSdkReady) throw new Error("Pi SDK belum siap.");
-    const scopes = ['username'];
-    const onIncompletePaymentFound = () => {}; 
-    const authResult = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
-    const userData = {
-      uid: authResult.user.uid,
-      username: authResult.user.username,
-      role: 'user',
-    };
-    setUser(userData);
-    return userData;
+    
+    try {
+      // Minta izin untuk username DAN pembayaran sekaligus.
+      const scopes = ['username', 'payments'];
+      
+      const authResult = await window.Pi.authenticate(scopes, () => {});
+      
+      // Pengecekan keamanan jika pengguna membatalkan atau terjadi error.
+      if (!authResult || !authResult.user) {
+        throw new Error("Proses izin dibatalkan atau gagal mendapatkan data pengguna.");
+      }
+      
+      const userData = {
+        uid: authResult.user.uid,
+        username: authResult.user.username,
+        role: 'user',
+      };
+      setUser(userData);
+
+      // Cek status admin ke backend
+      try {
+        const response = await fetch(`/api/admin?username=${userData.username}`);
+        const data = await response.json();
+        if (data.isAdmin) setIsAdmin(true);
+        else setIsAdmin(false);
+      } catch (error) {
+        console.error("Gagal memeriksa status admin:", error);
+      }
+      
+      return authResult;
+    } catch (err) {
+      // Lemparkan kembali error untuk ditangani oleh komponen pemanggil
+      throw err;
+    }
   };
 
-  // === BARU: Menambahkan fungsi createPayment ke Context ===
   const createPayment = async (paymentData, callbacks) => {
-    if (!isSdkReady) {
-      throw new Error("Pi SDK is not ready yet.");
-    }
-    // Langsung memanggil window.Pi.createPayment dari sini
-    await window.Pi.createPayment(paymentData, callbacks);
+    if (!isSdkReady) throw new Error("Pi SDK belum siap.");
+
+    const fullCallbacks = {
+        onReadyForServerApproval: () => {},
+        onReadyForServerCompletion: () => {},
+        onCancel: () => {},
+        onError: () => {},
+        ...callbacks
+    };
+    await window.Pi.createPayment(paymentData, fullCallbacks);
   };
 
   const logout = () => {
@@ -48,13 +77,8 @@ export function PiProvider({ children }) {
   };
   
   const value = useMemo(() => ({
-    isSdkReady,
-    user,
-    isAdmin,
-    authenticate,
-    createPayment, // <-- Menyertakan fungsi baru
-    setIsAdmin,
-    logout
+    isSdkReady, user, isAdmin,
+    authenticate, setIsAdmin, logout, createPayment
   }), [isSdkReady, user, isAdmin]);
 
   return (

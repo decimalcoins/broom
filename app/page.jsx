@@ -2,22 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { useAppContext } from '@/context/PiContext'; // <-- 1. Impor hook useAppContext
+import Link from 'next/link'; // <-- Impor komponen Link
+import { useAppContext } from '@/context/PiContext';
 import Splash from '@/components/Splash';
 import ProductCard from '@/components/ProductCard';
+import ChatModal from '@/components/ChatModal';
 
 // Gunakan dynamic import untuk memuat modal hanya di sisi klien
 const DynamicLoginModal = dynamic(() => import('@/components/LoginModal'), { ssr: false });
 const DynamicCheckoutModal = dynamic(() => import('@/components/CheckoutModal'), { ssr: false });
-const DynamicChatModal = dynamic(() => import('@/components/ChatModal'), { ssr: false });
 
 
 export default function HomePage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [products, setProducts] = useState([]);
   
-  // 2. Dapatkan state dan fungsi dari context
-  const { user, logout } = useAppContext(); 
+  // Ambil 'isAdmin' dari context
+  const { user, logout, isAdmin } = useAppContext(); 
   
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [checkoutProduct, setCheckoutProduct] = useState(null);
@@ -28,10 +29,11 @@ export default function HomePage() {
     const fetchProducts = async () => {
       try {
         const response = await fetch('/api/products');
+        if (!response.ok) throw new Error('Gagal mengambil data produk');
         const data = await response.json();
         setProducts(data);
       } catch (error) {
-        console.error("Gagal mengambil produk:", error);
+        console.error(error);
       }
     };
     fetchProducts();
@@ -43,14 +45,9 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, []);
   
-  // 3. Fungsi handleRoleSelected sekarang jauh lebih sederhana
-  // Karena state user sudah diatur di dalam context, kita hanya perlu menutup modal
   const handleRoleSelected = (role, userData) => {
-    // Logika untuk menyimpan user sudah ditangani oleh 'authenticate' di dalam context
-    // Logika untuk admin juga sudah ditangani di dalam LoginModal
     setShowLoginModal(false);
     if (role === 'admin') {
-      // Redirect ke halaman admin jika rolenya admin
       window.location.href = '/admin';
     }
   };
@@ -92,7 +89,7 @@ export default function HomePage() {
   };
 
   const renderContent = () => {
-    // 4. Gunakan 'user' dari context untuk menentukan apa yang ditampilkan
+    // Jika ada user yang login
     if (user) { 
       return (
         <div>
@@ -101,8 +98,26 @@ export default function HomePage() {
               <h2 className="text-2xl font-bold text-white">Produk untuk Anda</h2>
               <p className="text-slate-400">Selamat datang, @{user.username}!</p>
             </div>
-            {/* 5. Gunakan fungsi 'logout' dari context */}
-            <button onClick={logout} className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded">Logout</button>
+            {/* === PERUBAHAN: Menambahkan tombol dinamis === */}
+            <div className="flex items-center gap-4">
+              {/* Jika user BUKAN admin, tampilkan tombol untuk mendaftar */}
+              {!isAdmin && (
+                <button 
+                  onClick={() => setShowLoginModal(true)} 
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded"
+                >
+                  Daftar sebagai Admin
+                </button>
+              )}
+              {/* Jika user SUDAH admin, tampilkan link ke dashboard */}
+              {isAdmin && (
+                 <Link href="/admin" className="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded">
+                    Dashboard Admin
+                 </Link>
+              )}
+              <button onClick={logout} className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded">Logout</button>
+            </div>
+            {/* ========================================= */}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {products.map(product => (
@@ -119,6 +134,7 @@ export default function HomePage() {
       );
     }
 
+    // Jika belum login
     return (
         <div className="text-center">
             <h2 className="text-2xl font-bold text-tosca">Selamat Datang di Broom Marketplace!</h2>
@@ -155,7 +171,7 @@ export default function HomePage() {
       )}
 
       {chatProduct && (
-        <DynamicChatModal
+        <ChatModal
             product={chatProduct}
             onSend={handleSendMessage}
             onCancel={() => setChatProduct(null)}

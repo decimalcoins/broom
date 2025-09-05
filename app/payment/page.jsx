@@ -1,16 +1,15 @@
-
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from 'next/link'; // Impor Link untuk navigasi
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-// Pastikan impor ini menggunakan useAppContext
 import { useAppContext } from "@/context/PiContext";
 
 export default function PaymentPage() {
   const router = useRouter();
-  // Pastikan hook yang digunakan di sini adalah useAppContext
-  const { createPayment, isSdkReady, setIsAdmin } = useAppContext();
+  // Dapatkan 'user' dari context untuk memeriksa status login
+  const { user, createPayment, isSdkReady, setIsAdmin } = useAppContext();
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -32,17 +31,17 @@ export default function PaymentPage() {
 
     const callbacks = {
       onReadyForServerApproval: (paymentId) => {
-        console.log('Aktivasi penjual siap disetujui, paymentId:', paymentId);
         alert("Pembayaran 0.001 Pi berhasil! Akun Anda sekarang telah diaktifkan sebagai penjual.");
         setIsAdmin(true);
         router.push("/admin");
       },
+      onReadyForServerCompletion: (paymentId, txid) => {
+          console.log('Aktivasi penjual selesai di server', { paymentId, txid });
+      },
       onCancel: () => {
-        console.log('Aktivasi penjual dibatalkan.');
         setIsLoading(false);
       },
       onError: (err) => {
-        console.error('Error aktivasi penjual:', err);
         setError('Gagal memproses pembayaran.');
         setIsLoading(false);
       },
@@ -51,12 +50,32 @@ export default function PaymentPage() {
     try {
       await createPayment(paymentData, callbacks);
     } catch (err) {
-      console.error('Gagal memanggil createPayment:', err);
       setError('Gagal memulai proses pembayaran.');
       setIsLoading(false);
     }
   };
 
+  // === PERBAIKAN: Melindungi halaman ===
+  // Jika tidak ada user yang login, tampilkan pesan untuk login
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-900 text-white">
+        <Navbar onOpenLogin={() => router.push('/')} />
+        <main className="max-w-2xl mx-auto p-8 flex-1 flex items-center justify-center">
+          <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full text-center">
+            <h1 className="text-2xl font-bold text-white">Akses Ditolak</h1>
+            <p className="text-slate-400 mt-2 mb-6">Anda harus login terlebih dahulu untuk mengakses halaman ini.</p>
+            <Link href="/" className="bg-tosca hover:bg-tosca-dark text-black font-bold py-2 px-6 rounded-lg">
+              Kembali ke Halaman Utama
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Jika user sudah login, tampilkan halaman pembayaran seperti biasa
   return (
     <div className="min-h-screen flex flex-col bg-slate-900 text-white">
       <Navbar onOpenLogin={() => {}} />
@@ -90,3 +109,4 @@ export default function PaymentPage() {
     </div>
   );
 }
+

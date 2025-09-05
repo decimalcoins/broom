@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAppContext } from '@/context/PiContext';
 
 // Fungsi untuk memformat angka ke Rupiah
 const formatToIDR = (price) => {
@@ -12,24 +13,16 @@ const formatToIDR = (price) => {
 };
 
 export default function CheckoutModal({ product, onCheckout, onCancel }) {
+  const { createPayment, isSdkReady } = useAppContext();
   const [address, setAddress] = useState('');
   const [shipping, setShipping] = useState('');
-  const [shippingCost, setShippingCost] = useState(0);
   const [totalPrice, setTotalPrice] = useState(product.price);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [paymentStep, setPaymentStep] = useState('form'); // form, confirmation
+  const [paymentStep, setPaymentStep] = useState('form');
   const [proof, setProof] = useState(null);
-  const [isPiReady, setIsPiReady] = useState(false);
-
-  // useEffect untuk memeriksa ketersediaan Pi SDK setelah komponen dimuat di klien
-  useEffect(() => {
-    if (window.Pi) {
-      setIsPiReady(true);
-    }
-  }, []);
-
-  // Efek untuk menghitung total harga (harga produk + ongkir) untuk produk IDR
+  
+  // Efek untuk menghitung total harga untuk produk IDR
   useEffect(() => {
     if (product.currency.toLowerCase() === 'idr') {
       const getShippingCost = (service) => {
@@ -41,7 +34,6 @@ export default function CheckoutModal({ product, onCheckout, onCancel }) {
         }
       };
       const cost = getShippingCost(shipping);
-      setShippingCost(cost);
       setTotalPrice(product.price + cost);
     }
   }, [shipping, product.price, product.currency]);
@@ -50,10 +42,6 @@ export default function CheckoutModal({ product, onCheckout, onCancel }) {
   const handlePiCheckout = async () => {
     if (!address) {
       setError('Harap isi alamat lengkap.');
-      return;
-    }
-     if (!isPiReady) {
-      setError('Pi SDK belum siap. Coba lagi sebentar.');
       return;
     }
     setError('');
@@ -67,6 +55,10 @@ export default function CheckoutModal({ product, onCheckout, onCancel }) {
 
     const callbacks = {
       onReadyForServerApproval: (paymentId) => onCheckout({ paymentId, product, address, shipping }),
+      // === PERBAIKAN: Menambahkan callback yang hilang ===
+      onReadyForServerCompletion: (paymentId, txid) => {
+        console.log('Pembayaran produk selesai di server', { paymentId, txid });
+      },
       onCancel: () => setIsLoading(false),
       onError: (error) => {
         setError('Terjadi kesalahan dengan pembayaran Pi.');
@@ -75,7 +67,7 @@ export default function CheckoutModal({ product, onCheckout, onCancel }) {
     };
 
     try {
-      await window.Pi.createPayment(paymentData, callbacks);
+      await createPayment(paymentData, callbacks);
     } catch (err) {
       setError('Gagal memulai SDK Pi. Pastikan Anda di Pi Browser.');
       setIsLoading(false);
@@ -90,8 +82,6 @@ export default function CheckoutModal({ product, onCheckout, onCancel }) {
     }
     setError('');
     setIsLoading(true);
-    
-    // Kirim data ke parent komponen
     onCheckout({
       type: 'bank_transfer',
       product,
@@ -110,7 +100,7 @@ export default function CheckoutModal({ product, onCheckout, onCancel }) {
           <button 
             type="button" 
             onClick={handlePiCheckout}
-            disabled={isLoading || !isPiReady}
+            disabled={isLoading || !isSdkReady}
             className="bg-tosca hover:bg-tosca-dark px-6 py-2 rounded-lg font-bold w-48 disabled:opacity-50"
           >
             {isLoading ? 'Menunggu...' : `Bayar dengan Pi (π)`}

@@ -1,37 +1,50 @@
 'use client';
 
-import { useState } from 'react';
-// === PERBAIKAN: Menggunakan nama hook yang benar ===
+import React, { useState } from 'react';
 import { useAppContext } from '@/context/PiContext';
 
 export default function LoginModal({ onRoleSelected, onCancel }) {
-  // === PERBAIKAN: Menggunakan nama hook yang benar ===
-  const { authenticate, createPayment, isSdkReady, setIsAdmin } = useAppContext(); 
+  const { 
+    authenticate, 
+    createPayment, 
+    isSdkReady, 
+    setIsAdmin,
+    user // Ambil 'user' dari context untuk pendaftaran admin
+  } = useAppContext(); 
   
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Fungsi login user sekarang meminta semua izin
   const handleUserLogin = async () => {
     if (!isSdkReady) {
-      setError("Pi SDK sedang dimuat, coba lagi sebentar.");
+      setError("Pi SDK sedang dimuat...");
       return;
     }
     setIsLoading(true);
     setError('');
     try {
-      const userData = await authenticate();
-      onRoleSelected('user', userData);
+      const authResult = await authenticate();
+      onRoleSelected('user', authResult.user);
     } catch (err) {
-      setError('Gagal melakukan autentikasi dengan Pi.');
+      console.error("Authentication Error Details:", err);
+      setError(err.message || 'Gagal melakukan autentikasi.');
     } finally {
       setIsLoading(false);
     }
   };
-
+  
+  // Logika pendaftaran admin sekarang lebih sederhana
   const handleAdminRegistration = async () => {
     if (!isSdkReady) {
-      setError("Pi SDK sedang dimuat, coba lagi sebentar.");
+      setError("Pi SDK sedang dimuat...");
       return;
+    }
+
+    // Pengguna harus login dulu untuk mendapatkan username mereka
+    if (!user) {
+        setError("Silakan login sebagai 'User' terlebih dahulu.");
+        return;
     }
     
     setIsLoading(true);
@@ -40,31 +53,37 @@ export default function LoginModal({ onRoleSelected, onCancel }) {
     const paymentData = {
       amount: 0.001,
       memo: 'Pendaftaran Admin Broom Marketplace',
-      metadata: { type: 'admin_registration' },
+      metadata: { type: 'admin_registration', username: user.username },
     };
 
     const callbacks = {
-      onReadyForServerApproval: (paymentId) => {
-        console.log('Pendaftaran admin siap disetujui, paymentId:', paymentId);
-        setIsAdmin(true);
-        onRoleSelected('admin');
+      onReadyForServerApproval: async (paymentId) => {
+        try {
+            // Kirim username ke backend untuk disimpan
+            await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user.username }),
+            });
+            setIsAdmin(true);
+            onRoleSelected('admin');
+        } catch (dbError) {
+            setError("Pembayaran berhasil, tetapi gagal mendaftarkan admin.");
+            setIsLoading(false);
+        }
       },
-      onCancel: () => {
-        console.log('Pendaftaran admin dibatalkan.');
-        setIsLoading(false);
+      onReadyForServerCompletion: (paymentId, txid) => {
+        console.log('Pendaftaran admin selesai di server', { paymentId, txid });
       },
-      onError: (error) => {
-        console.error('Error pendaftaran admin:', error);
-        setError('Gagal memproses pembayaran pendaftaran.');
-        setIsLoading(false);
-      },
+      onCancel: () => setIsLoading(false),
+      onError: () => setError('Gagal memproses pembayaran.'),
     };
-
+    
     try {
+      // Karena izin sudah didapatkan saat login, kita bisa langsung membuat pembayaran.
       await createPayment(paymentData, callbacks);
-    } catch (err) {
-      console.error('Gagal memanggil createPayment:', err);
-      setError('Gagal memulai proses pembayaran.');
+    } catch(err) {
+      setError(err.message || 'Gagal memulai pembayaran.');
       setIsLoading(false);
     }
   };
