@@ -135,7 +135,7 @@ export default function CheckoutModal({ product, onCheckout, onCancel }) {
           <div className="mt-4 p-4 border-t border-slate-600 space-y-3">
             <p className="text-center text-slate-300">Silakan lakukan transfer ke rekening berikut:</p>
             <div className="bg-slate-900 p-4 rounded-lg text-center">
-              <p className="text-lg font-semibold">Bank BCA</p>
+              <p className="text-lg font-semibold">Sea Bank</p>
               <p className="text-2xl font-mono tracking-widest my-1">1234567890</p>
               <p className="text-md">a.n. Broom Admin</p>
             </div>
