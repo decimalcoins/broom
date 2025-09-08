@@ -1,4 +1,6 @@
-import { PiProvider } from '@/context/PiContext'; // <-- Nama yang diimpor adalah PiProvider
+'use client';
+
+import { PiProvider } from '@/context/PiContext';
 import './globals.css';
 import Footer from '@/components/Footer';
 
@@ -11,7 +13,6 @@ export default function RootLayout({ children }) {
   return (
     <html lang="id">
       <body className="min-h-screen text-white bg-slate-900 flex flex-col">
-        {/* Gunakan nama yang benar di sini: PiProvider */}
         <PiProvider>
           <div className="flex-grow">
             {children}
