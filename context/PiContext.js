@@ -13,79 +13,77 @@ export function PiProvider({ children }) {
   useEffect(() => {
     window.handlePiSdkReady = () => {
       console.log("Pi SDK loaded, initializing...");
-      window.Pi.init({ version: "2.0", sandbox: true }); 
+      window.Pi.init({ version: "2.0", sandbox: process.env.NEXT_PUBLIC_PI_ENV === "sandbox" });
       setIsSdkReady(true);
     };
     return () => { delete window.handlePiSdkReady; };
   }, []);
 
-  // --- DIPERBARUI: Meminta semua izin di awal untuk stabilitas ---
+  // === Login ===
   const authenticate = async () => {
     if (!isSdkReady) throw new Error("Pi SDK belum siap.");
-    
-    try {
-      // Minta izin untuk username DAN pembayaran sekaligus.
-      const scopes = ['username', 'payments'];
-      
-      const authResult = await window.Pi.authenticate(scopes, () => {});
-      
-      // Pengecekan keamanan jika pengguna membatalkan atau terjadi error.
-      if (!authResult || !authResult.user) {
-        throw new Error("Proses izin dibatalkan atau gagal mendapatkan data pengguna.");
-      }
-      
-      const userData = {
-        uid: authResult.user.uid,
-        username: authResult.user.username,
-        role: 'user',
-      };
-      setUser(userData);
+    const scopes = ['username', 'payments']; // ✅ penting untuk transaksi
+    const onIncompletePaymentFound = (payment) => {
+      console.log("Incomplete payment found", payment);
+    };
+    const authResult = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
 
-      // Cek status admin ke backend
-      try {
-        const response = await fetch(`/api/admin?username=${userData.username}`);
-        const data = await response.json();
-        if (data.isAdmin) setIsAdmin(true);
-        else setIsAdmin(false);
-      } catch (error) {
-        console.error("Gagal memeriksa status admin:", error);
-      }
-      
-      return authResult;
-    } catch (err) {
-      // Lemparkan kembali error untuk ditangani oleh komponen pemanggil
-      throw err;
-    }
+    const userData = {
+      uid: authResult.user.uid,
+      username: authResult.user.username,
+      role: 'user',
+    };
+    setUser(userData);
+    return userData;
   };
 
-  const createPayment = async (paymentData, callbacks) => {
+  // === Admin Upgrade (bayar 0.001π) ===
+  const upgradeToAdmin = async () => {
     if (!isSdkReady) throw new Error("Pi SDK belum siap.");
-
-    const fullCallbacks = {
-        onReadyForServerApproval: () => {},
-        onReadyForServerCompletion: () => {},
-        onCancel: () => {},
-        onError: () => {},
-        ...callbacks
+    const paymentData = {
+      amount: 0.001,
+      memo: "Upgrade ke Admin di Broom Marketplace",
+      metadata: { type: "admin-upgrade" },
     };
-    await window.Pi.createPayment(paymentData, fullCallbacks);
+
+    const callbacks = {
+      onReadyForServerApproval: (paymentId) => {
+        console.log("Server approval needed:", paymentId);
+      },
+      onReadyForServerCompletion: (paymentId, txid) => {
+        console.log("Server completion needed:", paymentId, txid);
+        setIsAdmin(true);
+      },
+      onCancel: (paymentId) => {
+        console.warn("Payment cancelled:", paymentId);
+      },
+      onError: (error, payment) => {
+        console.error("Payment error:", error, payment);
+      },
+    };
+
+    await window.Pi.createPayment(paymentData, callbacks);
   };
 
   const logout = () => {
     setUser(null);
     setIsAdmin(false);
   };
-  
+
   const value = useMemo(() => ({
-    isSdkReady, user, isAdmin,
-    authenticate, setIsAdmin, logout, createPayment
+    isSdkReady,
+    user,
+    isAdmin,
+    authenticate,
+    upgradeToAdmin, // ✅ khusus admin
+    logout
   }), [isSdkReady, user, isAdmin]);
 
   return (
     <PiContext.Provider value={value}>
       {children}
-      <Script 
-        src="https://sdk.minepi.com/pi-sdk.js" 
+      <Script
+        src="https://sdk.minepi.com/pi-sdk.js"
         strategy="afterInteractive"
         onLoad={() => window.handlePiSdkReady && window.handlePiSdkReady()}
       />
@@ -100,4 +98,3 @@ export function useAppContext() {
   }
   return context;
 }
-
