@@ -8,7 +8,7 @@ import LoginModal from "@/components/LoginModal";
 import CheckoutModal from "@/components/CheckoutModal";
 import ChatModal from "@/components/ChatModal";
 import Splash from "@/components/Splash";
-import { useApp } from "@/context/AppContext";
+import { useApp } from "@/context/PiContext";
 
 export default function HomePage() {
   const router = useRouter();

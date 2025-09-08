@@ -1,5 +1,5 @@
 "use client";
-import { useApp } from "@/context/AppContext";
+import { useApp } from "@/context/PiContext";
 
 export default function LoginModal({ open, onClose }) {
   const { setUser, setIsAdmin } = useApp();

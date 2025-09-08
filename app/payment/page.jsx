@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { useApp } from "@/context/AppContext";
+import { useApp } from "@/context/PiContext";
 
 export default function PaymentPage() {
   const router = useRouter();

@@ -2,7 +2,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
-import { useApp } from "@/context/AppContext";
+import { useApp } from "@/context/PiContext";
 import { useState } from "react";
 import Link from "next/link";
 

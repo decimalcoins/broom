@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useApp } from "@/context/AppContext";
+import { useApp } from "@/context/PiContext";
 import { useState } from "react";
 
 const icons = {
