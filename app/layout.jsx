@@ -1,8 +1,7 @@
-'use client';
-
-import { PiProvider } from '@/context/PiContext';
+// app/layout.jsx
 import './globals.css';
 import Footer from '@/components/Footer';
+import Providers from './providers'; // kita buat file baru khusus untuk PiProvider wrapper
 
 export const metadata = {
   title: "Broom Marketplace",
@@ -13,12 +12,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="id">
       <body className="min-h-screen text-white bg-slate-900 flex flex-col">
-        <PiProvider>
-          <div className="flex-grow">
-            {children}
-          </div>
+        <Providers>
+          <div className="flex-grow">{children}</div>
           <Footer />
-        </PiProvider>
+        </Providers>
       </body>
     </html>
   );
