@@ -1,0 +1,32 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Admin {
+  id        String  @id @default(cuid())
+  username  String  @unique
+  // Tambahkan relasi ke StoreProfile
+  storeProfile StoreProfile?
+}
+
+// === BARU: Model untuk menyimpan data profil toko ===
+model StoreProfile {
+  id          String  @id @default(cuid())
+  storeName   String
+  description String?
+  imageUrl    String?
+
+  // Relasi kembali ke Admin (satu profil dimiliki oleh satu admin)
+  admin         Admin    @relation(fields: [adminUsername], references: [username])
+  adminUsername String   @unique
+}
+// ======================================================
+

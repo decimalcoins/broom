@@ -1,37 +1,106 @@
 "use client";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from 'next/link'; // Impor Link untuk navigasi
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { useApp } from "@/context/PiContext";
+import { useAppContext } from "@/context/PiContext";
 
 export default function PaymentPage() {
   const router = useRouter();
-  const { setIsAdmin } = useApp();
+  // Dapatkan 'user' dari context untuk memeriksa status login
+  const { user, createPayment, isSdkReady, setIsAdmin } = useAppContext();
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handlePayment = () => {
-    alert("Pembayaran 0.001 Pi berhasil! Akun Anda sekarang telah diaktifkan sebagai penjual.");
-    setIsAdmin(true);
-    router.push("/admin");
+  const handlePayment = async () => {
+    if (!isSdkReady) {
+      setError("Pi SDK sedang dimuat, coba lagi sebentar.");
+      return;
+    }
+    
+    setIsLoading(true);
+    setError('');
+
+    const paymentData = {
+      amount: 0.001,
+      memo: 'Aktivasi Akun Penjual Broom Marketplace',
+      metadata: { type: 'seller_activation' },
+    };
+
+    const callbacks = {
+      onReadyForServerApproval: (paymentId) => {
+        alert("Pembayaran 0.001 Pi berhasil! Akun Anda sekarang telah diaktifkan sebagai penjual.");
+        setIsAdmin(true);
+        router.push("/admin");
+      },
+      onReadyForServerCompletion: (paymentId, txid) => {
+          console.log('Aktivasi penjual selesai di server', { paymentId, txid });
+      },
+      onCancel: () => {
+        setIsLoading(false);
+      },
+      onError: (err) => {
+        setError('Gagal memproses pembayaran.');
+        setIsLoading(false);
+      },
+    };
+
+    try {
+      await createPayment(paymentData, callbacks);
+    } catch (err) {
+      setError('Gagal memulai proses pembayaran.');
+      setIsLoading(false);
+    }
   };
 
+  // === PERBAIKAN: Melindungi halaman ===
+  // Jika tidak ada user yang login, tampilkan pesan untuk login
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-900 text-white">
+        <Navbar onOpenLogin={() => router.push('/')} />
+        <main className="max-w-2xl mx-auto p-8 flex-1 flex items-center justify-center">
+          <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full text-center">
+            <h1 className="text-2xl font-bold text-white">Akses Ditolak</h1>
+            <p className="text-slate-400 mt-2 mb-6">Anda harus login terlebih dahulu untuk mengakses halaman ini.</p>
+            <Link href="/" className="bg-tosca hover:bg-tosca-dark text-black font-bold py-2 px-6 rounded-lg">
+              Kembali ke Halaman Utama
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Jika user sudah login, tampilkan halaman pembayaran seperti biasa
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar onOpenLogin={()=>{}}/>
-      <main className="max-w-2xl mx-auto p-8 flex-1">
-        <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl">
+    <div className="min-h-screen flex flex-col bg-slate-900 text-white">
+      <Navbar onOpenLogin={() => {}} />
+      <main className="max-w-2xl mx-auto p-8 flex-1 flex items-center">
+        <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full">
           <div className="text-teal-400 text-5xl w-full flex justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg>
           </div>
           <h1 className="text-3xl font-bold text-white mt-4 text-center">Aktivasi Akun Penjual</h1>
           <p className="text-slate-400 mt-2 max-w-md mx-auto text-center">Lakukan pembayaran untuk mulai menjual produk Anda.</p>
+          
+          {error && <p className="text-red-400 text-center mt-4">{error}</p>}
+
           <div className="mt-8">
             <h2 className="text-xl font-semibold text-white mb-4 text-center">Detail Pembayaran</h2>
             <div className="bg-slate-700 rounded-lg p-6 text-center">
               <p className="text-slate-300">Total Biaya Aktivasi</p>
               <p className="text-4xl font-extrabold text-white mt-2">0.001 <span className="text-teal-400">π</span></p>
             </div>
-            <button onClick={handlePayment} className="mt-8 w-full text-lg font-semibold text-white px-8 py-4 rounded-full bg-gradient-to-r from-teal-500 to-emerald-600 hover:scale-105 transition-all">
-              Bayar dan Aktifkan Akun
+            <button 
+              onClick={handlePayment} 
+              disabled={isLoading || !isSdkReady}
+              className="mt-8 w-full text-lg font-semibold text-white px-8 py-4 rounded-full bg-gradient-to-r from-teal-500 to-emerald-600 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-wait"
+            >
+              {isLoading ? 'Memproses...' : 'Bayar dan Aktifkan Akun'}
             </button>
           </div>
         </div>
@@ -40,3 +109,4 @@ export default function PaymentPage() {
     </div>
   );
 }
+
