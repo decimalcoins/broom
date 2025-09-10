@@ -2,9 +2,9 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import { dummyProducts } from "@/lib/constants";
 
-const AppContext = createContext(null);
+const PiContext = createContext(null);
 
-export function AppProvider({ children }) {
+export function PiProvider({ children }) {
   const [user, setUser] = useState(null); // { username }
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminProducts, setAdminProducts] = useState([]);
@@ -19,11 +19,11 @@ export function AppProvider({ children }) {
     allProducts: [...dummyProducts, ...adminProducts],
   }), [user, isAdmin, adminProducts, sellerBankAccount]);
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return <PiContext.Provider value={value}>{children}</PiContext.Provider>;
 }
 
 export function useApp() {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error("useApp must be used within AppProvider");
+  const ctx = useContext(PiContext);
+  if (!ctx) throw new Error("useApp must be used within PiProvider");
   return ctx;
 }
