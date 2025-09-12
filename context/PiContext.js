@@ -91,7 +91,7 @@ export function PiProvider({ children }) {
   );
 }
 
-export function useAppContext() {
+export function useApp() {
   const context = useContext(PiContext);
   if (!context) {
     throw new Error('useAppContext must be used within a PiProvider');
