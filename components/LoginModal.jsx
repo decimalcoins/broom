@@ -1,8 +1,8 @@
 "use client";
-import { useApp } from "@/context/PiContext";
+import { useAppContext } from "@/context/PiContext";
 
 export default function LoginModal({ onClose }) {
-  const { handleUserLogin, handleAdminLogin } = useApp();
+  const { handleUserLogin, handleAdminLogin } = useAppContext();
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
