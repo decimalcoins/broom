@@ -1,6 +1,13 @@
+
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+} from 'react';
 import Script from 'next/script';
 
 const PiContext = createContext();
@@ -13,12 +20,16 @@ export function PiProvider({ children }) {
   // === Init Pi SDK ===
   useEffect(() => {
     window.handlePiSdkReady = () => {
-      console.log('Pi SDK loaded, initializing...');
-      window.Pi.init({
-        version: '2.0',
-        sandbox: process.env.NEXT_PUBLIC_PI_ENV === 'sandbox',
-      });
-      setIsSdkReady(true);
+      console.log('✅ Pi SDK loaded, initializing...');
+      if (window.Pi && typeof window.Pi.init === 'function') {
+        window.Pi.init({
+          version: '2.0',
+          sandbox: process.env.NEXT_PUBLIC_PI_ENV === 'sandbox',
+        });
+        setIsSdkReady(true);
+      } else {
+        console.warn('⚠️ window.Pi tidak tersedia.');
+      }
     };
     return () => {
       delete window.handlePiSdkReady;
@@ -27,14 +38,28 @@ export function PiProvider({ children }) {
 
   // === Login user ===
   const authenticate = async () => {
+    console.log('👉 Klik login user');
+    console.log('isSdkReady:', isSdkReady, 'window.Pi:', window.Pi);
+
+    // fallback untuk dev (tanpa Pi Browser)
+    if (!window.Pi) {
+      console.warn('Pi SDK tidak tersedia, simulasi login.');
+      const fake = { uid: 'local-1', username: 'tester', role: 'user' };
+      setUser(fake);
+      return fake;
+    }
+
     if (!isSdkReady) throw new Error('Pi SDK belum siap.');
 
     const scopes = ['username', 'payments'];
-    const onIncompletePaymentFound = (payment) => {
+    const onIncompletePaymentFound = (payment) =>
       console.log('Incomplete payment found', payment);
-    };
 
-    const authResult = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+    const authResult = await window.Pi.authenticate(
+      scopes,
+      onIncompletePaymentFound
+    );
+
     const userData = {
       uid: authResult.user.uid,
       username: authResult.user.username,
@@ -46,6 +71,16 @@ export function PiProvider({ children }) {
 
   // === Upgrade Admin (bayar 0.001π) ===
   const upgradeToAdmin = async () => {
+    console.log('👉 Klik upgrade admin');
+    console.log('isSdkReady:', isSdkReady, 'window.Pi:', window.Pi);
+
+    if (!window.Pi) {
+      console.warn('Pi SDK tidak ada, simulasi admin.');
+      setUser({ username: 'tester', role: 'admin' });
+      setIsAdmin(true);
+      return;
+    }
+
     if (!isSdkReady) throw new Error('Pi SDK belum siap.');
 
     const paymentData = {
@@ -55,32 +90,28 @@ export function PiProvider({ children }) {
     };
 
     const callbacks = {
-      onReadyForServerApproval: (paymentId) => {
-        console.log('Server approval needed:', paymentId);
-      },
+      onReadyForServerApproval: (paymentId) =>
+        console.log('Server approval needed:', paymentId),
       onReadyForServerCompletion: (paymentId, txid) => {
         console.log('Server completion needed:', paymentId, txid);
         setIsAdmin(true);
       },
-      onCancel: (paymentId) => {
-        console.warn('Payment cancelled:', paymentId);
-      },
-      onError: (error, payment) => {
-        console.error('Payment error:', error, payment);
-      },
+      onCancel: (paymentId) => console.warn('Payment cancelled:', paymentId),
+      onError: (error, payment) =>
+        console.error('Payment error:', error, payment),
     };
 
     await window.Pi.createPayment(paymentData, callbacks);
   };
 
-  // === Alias supaya sesuai dengan LoginModal.jsx ===
-  const handleUserLogin = () => authenticate();
-  const handleAdminLogin = () => upgradeToAdmin();
-
   const logout = () => {
     setUser(null);
     setIsAdmin(false);
   };
+
+  // === Alias agar sama dengan LoginModal.jsx ===
+  const handleUserLogin = () => authenticate();
+  const handleAdminLogin = () => upgradeToAdmin();
 
   const value = useMemo(
     () => ({
@@ -102,7 +133,9 @@ export function PiProvider({ children }) {
       <Script
         src="https://sdk.minepi.com/pi-sdk.js"
         strategy="afterInteractive"
-        onLoad={() => window.handlePiSdkReady && window.handlePiSdkReady()}
+        onLoad={() =>
+          window.handlePiSdkReady && window.handlePiSdkReady()
+        }
       />
     </PiContext.Provider>
   );
