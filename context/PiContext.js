@@ -10,24 +10,31 @@ export function PiProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // === Init Pi SDK ===
   useEffect(() => {
     window.handlePiSdkReady = () => {
-      console.log("Pi SDK loaded, initializing...");
-      window.Pi.init({ version: "2.0", sandbox: process.env.NEXT_PUBLIC_PI_ENV === "sandbox" });
+      console.log('Pi SDK loaded, initializing...');
+      window.Pi.init({
+        version: '2.0',
+        sandbox: process.env.NEXT_PUBLIC_PI_ENV === 'sandbox',
+      });
       setIsSdkReady(true);
     };
-    return () => { delete window.handlePiSdkReady; };
+    return () => {
+      delete window.handlePiSdkReady;
+    };
   }, []);
 
-  // === Login ===
+  // === Login user ===
   const authenticate = async () => {
-    if (!isSdkReady) throw new Error("Pi SDK belum siap.");
-    const scopes = ['username', 'payments']; // ✅ penting untuk transaksi
-    const onIncompletePaymentFound = (payment) => {
-      console.log("Incomplete payment found", payment);
-    };
-    const authResult = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+    if (!isSdkReady) throw new Error('Pi SDK belum siap.');
 
+    const scopes = ['username', 'payments'];
+    const onIncompletePaymentFound = (payment) => {
+      console.log('Incomplete payment found', payment);
+    };
+
+    const authResult = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
     const userData = {
       uid: authResult.user.uid,
       username: authResult.user.username,
@@ -37,47 +44,57 @@ export function PiProvider({ children }) {
     return userData;
   };
 
-  // === Admin Upgrade (bayar 0.001π) ===
+  // === Upgrade Admin (bayar 0.001π) ===
   const upgradeToAdmin = async () => {
-    if (!isSdkReady) throw new Error("Pi SDK belum siap.");
+    if (!isSdkReady) throw new Error('Pi SDK belum siap.');
+
     const paymentData = {
       amount: 0.001,
-      memo: "Upgrade ke Admin di Broom Marketplace",
-      metadata: { type: "admin-upgrade" },
+      memo: 'Upgrade ke Admin di Broom Marketplace',
+      metadata: { type: 'admin-upgrade' },
     };
 
     const callbacks = {
       onReadyForServerApproval: (paymentId) => {
-        console.log("Server approval needed:", paymentId);
+        console.log('Server approval needed:', paymentId);
       },
       onReadyForServerCompletion: (paymentId, txid) => {
-        console.log("Server completion needed:", paymentId, txid);
+        console.log('Server completion needed:', paymentId, txid);
         setIsAdmin(true);
       },
       onCancel: (paymentId) => {
-        console.warn("Payment cancelled:", paymentId);
+        console.warn('Payment cancelled:', paymentId);
       },
       onError: (error, payment) => {
-        console.error("Payment error:", error, payment);
+        console.error('Payment error:', error, payment);
       },
     };
 
     await window.Pi.createPayment(paymentData, callbacks);
   };
 
+  // === Alias supaya sesuai dengan LoginModal.jsx ===
+  const handleUserLogin = () => authenticate();
+  const handleAdminLogin = () => upgradeToAdmin();
+
   const logout = () => {
     setUser(null);
     setIsAdmin(false);
   };
 
-  const value = useMemo(() => ({
-    isSdkReady,
-    user,
-    isAdmin,
-    authenticate,
-    upgradeToAdmin, // ✅ khusus admin
-    logout
-  }), [isSdkReady, user, isAdmin]);
+  const value = useMemo(
+    () => ({
+      isSdkReady,
+      user,
+      isAdmin,
+      authenticate,
+      upgradeToAdmin,
+      handleUserLogin,
+      handleAdminLogin,
+      logout,
+    }),
+    [isSdkReady, user, isAdmin]
+  );
 
   return (
     <PiContext.Provider value={value}>
