@@ -1,13 +1,21 @@
+/* Import font harus paling atas */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import "@fortawesome/fontawesome-free/css/all.min.css";
+
+
+/* Tailwind directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
+
+/* Variabel global */
 :root {
   --bg: #0f172a; /* slate-900 */
 }
 
+/* Reset & base styles */
 html, body {
   height: 100%;
 }
@@ -17,21 +25,39 @@ body {
   background-color: var(--bg);
 }
 
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: #1e293b; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #475569; }
+/* Scrollbar custom */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
 
+/* Utility classes */
 .disabled-btn {
   cursor: not-allowed;
   background-image: none;
   background-color: #475569;
 }
 
+/* Animations */
 .fade-in-up {
   animation: fadeInUp 1.5s ease-out forwards;
 }
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
