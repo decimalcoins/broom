@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAppContext } from "@/context/PiContext";
@@ -11,6 +12,7 @@ export default function LoginModal({ onClose }) {
     try {
       await handleUserLogin();
       console.log("✅ [LoginModal] Selesai login user", user);
+      onClose?.();           // ✅ Tutup modal setelah sukses login user
     } catch (err) {
       console.error("❌ [LoginModal] Gagal login user:", err);
     }
@@ -21,6 +23,7 @@ export default function LoginModal({ onClose }) {
     try {
       await handleAdminLogin();
       console.log("✅ [LoginModal] Selesai upgrade admin", { user, isAdmin });
+      onClose?.();           // ✅ Tutup modal setelah upgrade admin
     } catch (err) {
       console.error("❌ [LoginModal] Gagal upgrade admin:", err);
     }
