@@ -9,6 +9,7 @@ import Splash from '@/components/Splash';
 import ProductCard from '@/components/ProductCard';
 import ChatModal from '@/components/ChatModal';
 
+// Modal dimuat dinamis supaya tidak error di server
 const DynamicLoginModal = dynamic(() => import('@/components/LoginModal'), {
   ssr: false,
 });
@@ -25,6 +26,7 @@ export default function HomePage() {
   const [checkoutProduct, setCheckoutProduct] = useState(null);
   const [chatProduct, setChatProduct] = useState(null);
 
+  // === Ambil daftar produk ===
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -39,10 +41,19 @@ export default function HomePage() {
     fetchProducts();
   }, []);
 
+  // === Splash screen ===
   useEffect(() => {
     const timer = setTimeout(() => setInitialLoading(false), 3000);
     return () => clearTimeout(timer);
   }, []);
+
+  // Tutup modal setelah login dan arahkan admin
+  const handleRoleSelected = (role) => {
+    setShowLoginModal(false);
+    if (role === 'admin') {
+      window.location.href = '/admin';
+    }
+  };
 
   const handleBuy = (product) => setCheckoutProduct(product);
   const handleChat = (product) => setChatProduct(product);
@@ -84,8 +95,11 @@ export default function HomePage() {
               <h2 className="text-2xl font-bold text-white">
                 Produk untuk Anda
               </h2>
-              <p className="text-slate-400">Selamat datang, @{user.username}!</p>
+              <p className="text-slate-400">
+                Selamat datang, @{user.username}!
+              </p>
             </div>
+
             <div className="flex items-center gap-4">
               {!isAdmin && (
                 <button
@@ -95,6 +109,7 @@ export default function HomePage() {
                   Daftar sebagai Admin
                 </button>
               )}
+
               {isAdmin && (
                 <Link
                   href="/admin"
@@ -103,6 +118,7 @@ export default function HomePage() {
                   Dashboard Admin
                 </Link>
               )}
+
               <button
                 onClick={logout}
                 className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded"
@@ -111,6 +127,7 @@ export default function HomePage() {
               </button>
             </div>
           </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {products.map((product) => (
               <ProductCard
@@ -151,7 +168,10 @@ export default function HomePage() {
   return (
     <main className="min-h-screen p-6">
       {showLoginModal && (
-        <DynamicLoginModal onClose={() => setShowLoginModal(false)} />
+        <DynamicLoginModal
+          onClose={() => setShowLoginModal(false)}
+          onRoleSelected={handleRoleSelected} // ✅ penting!
+        />
       )}
 
       {checkoutProduct && (

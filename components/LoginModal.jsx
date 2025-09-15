@@ -3,16 +3,17 @@
 
 import { useAppContext } from "@/context/PiContext";
 
-export default function LoginModal({ onClose }) {
+export default function LoginModal({ onClose, onRoleSelected }) {
   const { handleUserLogin, handleAdminLogin, user, isAdmin, isSdkReady } =
     useAppContext();
 
   const onUserClick = async () => {
     console.log("🔵 [LoginModal] Tombol User diklik");
     try {
-      await handleUserLogin();
-      console.log("✅ [LoginModal] Selesai login user", user);
-      onClose?.();           // ✅ Tutup modal setelah sukses login user
+      const u = await handleUserLogin();
+      console.log("✅ [LoginModal] Selesai login user", u);
+      if (onRoleSelected) onRoleSelected("user", u);
+      onClose?.();
     } catch (err) {
       console.error("❌ [LoginModal] Gagal login user:", err);
     }
@@ -23,7 +24,8 @@ export default function LoginModal({ onClose }) {
     try {
       await handleAdminLogin();
       console.log("✅ [LoginModal] Selesai upgrade admin", { user, isAdmin });
-      onClose?.();           // ✅ Tutup modal setelah upgrade admin
+      if (onRoleSelected) onRoleSelected("admin", user);
+      onClose?.();
     } catch (err) {
       console.error("❌ [LoginModal] Gagal upgrade admin:", err);
     }
@@ -58,8 +60,8 @@ export default function LoginModal({ onClose }) {
         </button>
 
         <p className="mt-3 text-xs text-gray-400">
-          SDK Ready: {isSdkReady ? "✅" : "❌"} | User:{" "}
-          {user ? JSON.stringify(user) : "-"} | Admin:{" "}
+          SDK Ready: {isSdkReady ? "✅" : "❌"} | User:
+          {user ? JSON.stringify(user) : "-"} | Admin:
           {isAdmin ? "✅" : "❌"}
         </p>
       </div>
