@@ -16,6 +16,7 @@ export function PiProvider({ children }) {
   const [isSdkReady, setIsSdkReady] = useState(false);
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [lastPayment, setLastPayment] = useState(null);
 
   // === Init Pi SDK ===
   useEffect(() => {
@@ -31,9 +32,7 @@ export function PiProvider({ children }) {
         console.warn('⚠️ window.Pi tidak tersedia.');
       }
     };
-    return () => {
-      delete window.handlePiSdkReady;
-    };
+    return () => delete window.handlePiSdkReady;
   }, []);
 
   // === Login user ===
@@ -70,18 +69,21 @@ export function PiProvider({ children }) {
   };
 
   // === Upgrade Admin (bayar 0.001π) ===
-  const upgradeToAdmin = async () => {
+  const upgradeToAdmin = () => {
     console.log('👉 Klik upgrade admin');
     console.log('isSdkReady:', isSdkReady, 'window.Pi:', window.Pi);
 
+    // fallback saat bukan di Pi Browser
     if (!window.Pi) {
       console.warn('Pi SDK tidak ada, simulasi admin.');
-      setUser({ username: 'tester', role: 'admin' });
+      setUser({ uid: 'local-1', username: 'tester', role: 'admin' });
       setIsAdmin(true);
-      return;
+      return Promise.resolve({ paymentId: 'simulated', txid: 'simulated' });
     }
 
-    if (!isSdkReady) throw new Error('Pi SDK belum siap.');
+    if (!isSdkReady) {
+      return Promise.reject(new Error('Pi SDK belum siap.'));
+    }
 
     const paymentData = {
       amount: 0.001,
@@ -89,27 +91,39 @@ export function PiProvider({ children }) {
       metadata: { type: 'admin-upgrade' },
     };
 
-    const callbacks = {
-      onReadyForServerApproval: (paymentId) =>
-        console.log('Server approval needed:', paymentId),
-      onReadyForServerCompletion: (paymentId, txid) => {
-        console.log('Server completion needed:', paymentId, txid);
-        setIsAdmin(true);
-      },
-      onCancel: (paymentId) => console.warn('Payment cancelled:', paymentId),
-      onError: (error, payment) =>
-        console.error('Payment error:', error, payment),
-    };
+    return new Promise((resolve, reject) => {
+      window.Pi.createPayment(paymentData, {
+        onReadyForServerApproval: (paymentId) =>
+          console.log('Server approval needed:', paymentId),
 
-    await window.Pi.createPayment(paymentData, callbacks);
+        onReadyForServerCompletion: (paymentId, txid) => {
+          console.log('✅ Pembayaran selesai', { paymentId, txid });
+          setIsAdmin(true);
+          setUser((prev) => ({ ...prev, role: 'admin' }));
+          setLastPayment({ paymentId, txid });
+          resolve({ paymentId, txid });
+        },
+
+        onCancel: (paymentId) => {
+          console.warn('❌ Pembayaran dibatalkan:', paymentId);
+          reject(new Error('Pembayaran dibatalkan.'));
+        },
+
+        onError: (error, payment) => {
+          console.error('⚠️ Payment error:', error, payment);
+          reject(error);
+        },
+      });
+    });
   };
 
   const logout = () => {
     setUser(null);
     setIsAdmin(false);
+    setLastPayment(null);
   };
 
-  // === Alias agar sama dengan LoginModal.jsx ===
+  // === Alias supaya konsisten dengan LoginModal.jsx ===
   const handleUserLogin = () => authenticate();
   const handleAdminLogin = () => upgradeToAdmin();
 
@@ -118,13 +132,14 @@ export function PiProvider({ children }) {
       isSdkReady,
       user,
       isAdmin,
+      lastPayment,
       authenticate,
       upgradeToAdmin,
       handleUserLogin,
       handleAdminLogin,
       logout,
     }),
-    [isSdkReady, user, isAdmin]
+    [isSdkReady, user, isAdmin, lastPayment]
   );
 
   return (

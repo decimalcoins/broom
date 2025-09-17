@@ -1,70 +1,85 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getPiSdk } from '../lib/pi'; // <-- Impor fungsi yang benar
+import { useRouter } from 'next/navigation';
+import { getPiSdk } from '@/lib/pi';
 
-export default function PiLoginButton() {
+export default function PiLoginButton({ role = 'user' }) {
   const [pi, setPi] = useState(null);
-  const [paymentStatus, setPaymentStatus] = useState('');
+  const [user, setUser] = useState(null);
+  const [status, setStatus] = useState('');
+  const router = useRouter();
 
-  // useEffect dijalankan di sisi klien (browser)
+  // Ambil Pi SDK ketika komponen dimount
   useEffect(() => {
-    // Panggil helper untuk mendapatkan objek Pi SDK
     const sdk = getPiSdk();
-    if (sdk) {
-      setPi(sdk);
-    }
+    if (sdk) setPi(sdk);
   }, []);
 
-  const handlePayment = () => {
+  // --- LOGIN UTAMA ---
+  const handleLogin = async () => {
     if (!pi) {
-      setPaymentStatus("Pi SDK belum siap.");
+      setStatus('Pi SDK belum siap. Buka halaman ini di Pi Browser.');
       return;
     }
 
-    setPaymentStatus("Membuat pembayaran...");
+    try {
+      setStatus('🔑 Mengautentikasi...');
+      const me = await pi.authenticate({ permissions: ['username'] });
+      setUser(me);
 
+      if (role === 'user') {
+        // Simpan data user & role
+        localStorage.setItem('piUser', JSON.stringify(me));
+        localStorage.setItem('role', 'user');
+        router.push('/');
+      } else if (role === 'admin') {
+        setStatus('Login sukses, memulai pembayaran 0.001 π...');
+        handlePayment(me);
+      }
+    } catch (err) {
+      setStatus(`❌ Gagal login: ${err.message}`);
+    }
+  };
+
+  // --- PEMBAYARAN ADMIN ---
+  const handlePayment = (me) => {
     const paymentData = {
-      amount: 0.001, // Ganti dengan jumlah yang Anda inginkan
-      memo: "Demo pembayaran Broom Marketplace",
-      metadata: { orderId: "order123" },
+      amount: 0.001,
+      memo: 'Biaya akses admin Broom Marketplace',
+      metadata: { type: 'admin_fee', ts: Date.now() },
     };
 
     const callbacks = {
       onReadyForServerApproval: (paymentId) => {
-        setPaymentStatus(`Menunggu persetujuan server untuk paymentId: ${paymentId}`);
-        // Di aplikasi nyata, Anda akan mengirim paymentId ini ke server Anda
-        // lalu server Anda akan memanggil endpoint Pi untuk menyetujui.
-        // Untuk demo, kita anggap server langsung setuju.
+        setStatus(`Menunggu persetujuan server... (${paymentId})`);
+        // Untuk demo, kita skip approve server
         setTimeout(() => {
-            alert(`DEMO: Server menyetujui pembayaran ${paymentId}. Lanjutkan di aplikasi Pi.`);
-        }, 3000);
+          setStatus('Server menyetujui pembayaran, lanjut...');
+        }, 1500);
       },
       onReadyForServerCompletion: (paymentId, txid) => {
-        setPaymentStatus(`Pembayaran selesai! TXID: ${txid}`);
-         // Di aplikasi nyata, server Anda akan memverifikasi TXID
-         // lalu mengirim barang/layanan.
+        setStatus(`✅ Pembayaran berhasil (TXID: ${txid})`);
+        localStorage.setItem('piUser', JSON.stringify(me));
+        localStorage.setItem('role', 'admin');
+        router.push('/admin');
       },
-      onCancel: (paymentId) => {
-        setPaymentStatus(`Pembayaran dibatalkan: ${paymentId}`);
-      },
-      onError: (error) => {
-        setPaymentStatus(`Error: ${error.message}`);
-      },
+      onCancel: () => setStatus('❌ Pembayaran dibatalkan'),
+      onError: (e) => setStatus(`⚠️ Error: ${e.message}`),
     };
 
     pi.createPayment(paymentData, callbacks);
   };
 
   return (
-    <div className="flex flex-col items-center gap-4">
-        <button 
-          onClick={handlePayment} 
-          className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-        >
-          Bayar 0.1 π (Demo)
-        </button>
-        {paymentStatus && <p className="text-sm text-gray-400">{paymentStatus}</p>}
+    <div className="flex flex-col items-center gap-3">
+      <button
+        onClick={handleLogin}
+        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition"
+      >
+        {role === 'admin' ? 'Login sebagai Admin (0.001 π)' : 'Login sebagai User'}
+      </button>
+      {status && <p className="text-sm text-gray-500">{status}</p>}
     </div>
   );
 }
