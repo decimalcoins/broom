@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, {
@@ -18,6 +17,22 @@ export function PiProvider({ children }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [lastPayment, setLastPayment] = useState(null);
 
+  // === Load user dari localStorage saat awal ===
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('broom_user');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setUser(parsed);
+          setIsAdmin(parsed.role === 'admin');
+        } catch (e) {
+          console.warn('⚠️ Gagal parse user dari localStorage', e);
+        }
+      }
+    }
+  }, []);
+
   // === Init Pi SDK ===
   useEffect(() => {
     window.handlePiSdkReady = () => {
@@ -35,6 +50,13 @@ export function PiProvider({ children }) {
     return () => delete window.handlePiSdkReady;
   }, []);
 
+  // === Simpan user ke localStorage setiap kali berubah ===
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user) {
+      localStorage.setItem('broom_user', JSON.stringify(user));
+    }
+  }, [user]);
+
   // === Login user ===
   const authenticate = async () => {
     console.log('👉 Klik login user');
@@ -45,6 +67,7 @@ export function PiProvider({ children }) {
       console.warn('Pi SDK tidak tersedia, simulasi login.');
       const fake = { uid: 'local-1', username: 'tester', role: 'user' };
       setUser(fake);
+      setIsAdmin(false);
       return fake;
     }
 
@@ -65,6 +88,7 @@ export function PiProvider({ children }) {
       role: 'user',
     };
     setUser(userData);
+    setIsAdmin(false);
     return userData;
   };
 
@@ -76,7 +100,8 @@ export function PiProvider({ children }) {
     // fallback saat bukan di Pi Browser
     if (!window.Pi) {
       console.warn('Pi SDK tidak ada, simulasi admin.');
-      setUser({ uid: 'local-1', username: 'tester', role: 'admin' });
+      const adminUser = { uid: 'local-1', username: 'tester', role: 'admin' };
+      setUser(adminUser);
       setIsAdmin(true);
       return Promise.resolve({ paymentId: 'simulated', txid: 'simulated' });
     }
@@ -98,8 +123,9 @@ export function PiProvider({ children }) {
 
         onReadyForServerCompletion: (paymentId, txid) => {
           console.log('✅ Pembayaran selesai', { paymentId, txid });
+          const updated = { ...user, role: 'admin' };
+          setUser(updated);
           setIsAdmin(true);
-          setUser((prev) => ({ ...prev, role: 'admin' }));
           setLastPayment({ paymentId, txid });
           resolve({ paymentId, txid });
         },
@@ -121,6 +147,9 @@ export function PiProvider({ children }) {
     setUser(null);
     setIsAdmin(false);
     setLastPayment(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('broom_user');
+    }
   };
 
   // === Alias supaya konsisten dengan LoginModal.jsx ===
